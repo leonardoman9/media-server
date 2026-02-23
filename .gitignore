@@ -1,0 +1,17 @@
+.env
+*.db
+
+# runtime configs / data
+filebrowser/
+homarr/
+memos/
+n8n/
+pihole/
+slskd-config/
+soularr-config/
+speedtest-tracker/
+zim/
+
+# local-only configs with secrets
+nginx/conf.d/services.conf
+go2rtc.yaml

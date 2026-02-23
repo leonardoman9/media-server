@@ -1,0 +1,323 @@
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    environment:
+      - DOMAIN=${DOMAIN}
+    ports:
+      - "${NGINX_HTTP_BIND}"
+    volumes:
+      - ${NGINX_TEMPLATES}:/etc/nginx/templates:ro
+    networks: [proxy]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+  openwebui:
+    image: ghcr.io/open-webui/open-webui:main-slim
+    ports:
+      - "${OPENWEBUI_PORT}"
+    volumes:
+      - ${OPENWEBUI_DATA}:/app/backend/data
+    networks: [proxy]
+    environment:
+      - OPENAI_API_BASE_URL=${OPENAI_API_BASE_URL}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+  stremio-jellyfin:
+    image: ghcr.io/akarazniewicz/stremio-jellyfin:latest
+    container_name: stremio-jellyfin
+    network_mode: host
+    environment:
+      - JELLYFIN_USER=${JELLYFIN_USER}
+      - JELLYFIN_PASSWORD=${JELLYFIN_PASSWORD}
+      - JELLYFIN_SERVER=http://127.0.0.1:8096
+    depends_on:
+      - jellyfin
+    restart: unless-stopped
+  memos:
+    image: neosmemo/memos:stable
+    container_name: memos
+    ports:
+      - "${MEMOS_PORT}"
+    volumes:
+      - ${MEMOS_DATA}:/var/opt/memos
+    networks: [proxy]
+    environment:
+      - MEMOS_MODE=prod
+      - MEMOS_PORT=5230
+    restart: unless-stopped
+  filebrowser:
+    image: filebrowser/filebrowser:latest
+    container_name: filebrowser
+    networks: [proxy]
+    ports:
+      - "${FILEBROWSER_PORT}"
+    volumes:
+      - ${FILEBROWSER_SRV}:/srv
+      - ${FILEBROWSER_DB}:/database
+      - ${FILEBROWSER_CONFIG}:/config
+    restart: unless-stopped
+  pihole:
+    image: pihole/pihole:latest
+    container_name: pihole
+    networks: [proxy]
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    ports:
+      - "${PIHOLE_DNS_TCP}"
+      - "${PIHOLE_DNS_UDP}"
+    environment:
+      - TZ=Europe/Rome
+      - FTLCONF_webserver_api_password=${FTLCONF_webserver_api_password}
+      - FTLCONF_dns_upstreams=1.1.1.1;8.8.8.8
+      - FTLCONF_dns_listeningMode=ALL
+    volumes:
+      - ${PIHOLE_ETC}:/etc/pihole
+    restart: unless-stopped
+
+  
+  homarr:
+    container_name: homarr
+    image: ghcr.io/homarr-labs/homarr:latest
+    restart: unless-stopped
+    volumes:
+      - ${DOCKER_SOCK}:/var/run/docker.sock
+      - ${HOMARR_APPDATA}:/appdata
+    networks: [proxy]
+    
+    environment:
+      - SECRET_ENCRYPTION_KEY=${SECRET_ENCRYPTION_KEY}
+    ports:
+      - "${HOMARR_PORT}"
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: jellyfin
+    networks: [proxy]
+    ports:
+      - "${JELLYFIN_PORT}"
+      # - "8920:8920" # HTTPS opzionale se lo configuri in Jellyfin
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Rome
+      # NVIDIA Container Toolkit
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,video,utility
+    #runtime: nvidia
+    volumes:
+      - ${JELLYFIN_MEDIA}:/media
+      - ${JELLYFIN_CONFIG}:/config
+    restart: unless-stopped
+  jellyseerr:
+    image: ghcr.io/fallenbagel/jellyseerr:latest
+    init: true
+    container_name: jellyseerr
+    network_mode: host
+
+    environment:
+      - LOG_LEVEL=debug
+    ports:
+      - "${JELLYSEERR_PORT}"
+    volumes:
+      - ${JELLYSEERR_CONFIG}:/app/config
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:5055/api/v1/status || exit 1
+      start_period: 20s
+      timeout: 3s
+      interval: 15s
+      retries: 3
+    restart: unless-stopped
+  qbittorrent:
+    image: linuxserver/qbittorrent
+    container_name: qbittorrent
+    networks: [proxy]
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - WEBUI_PORT=8080
+    volumes:
+      - ${QBITTORRENT_CONFIG}:/config
+      - ${QBITTORRENT_DOWNLOADS}:/downloads
+    ports:
+      - "${QBITTORRENT_PORT}"
+    restart: unless-stopped
+
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    networks: [proxy]
+    environment:
+      - PUID=1000
+      - PGID=1000
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    volumes:
+      - ${PROWLARR_CONFIG}:/config
+    ports:
+      - "${PROWLARR_PORT}"
+    restart: unless-stopped
+
+  sonarr:
+    image: lscr.io/linuxserver/sonarr
+    container_name: sonarr
+    networks: [proxy]
+    environment:
+      - PUID=1000
+      - PGID=1000
+    volumes:
+      - ${SONARR_CONFIG}:/config
+      - ${SONARR_MEDIA}:/media
+      - ${SONARR_DOWNLOADS}:/downloads
+    ports:
+      - "${SONARR_PORT}"
+    restart: unless-stopped
+
+  radarr:
+    image: lscr.io/linuxserver/radarr
+    container_name: radarr
+    networks: [proxy]
+    environment:
+      - PUID=1000
+      - PGID=1000
+    volumes:
+      - ${RADARR_CONFIG}:/config
+      - ${RADARR_MEDIA}:/media
+      - ${RADARR_DOWNLOADS}:/downloads
+    ports:
+      - "${RADARR_PORT}"
+    restart: unless-stopped
+
+  lidarr:
+    image: lscr.io/linuxserver/lidarr
+    container_name: lidarr
+    networks: [proxy]
+    environment:
+      - PUID=1000
+      - PGID=1000
+    volumes:
+      - ${LIDARR_CONFIG}:/config
+      - ${LIDARR_MEDIA}:/media
+      - ${LIDARR_DOWNLOADS}:/downloads
+    ports:
+      - "${LIDARR_PORT}"
+    restart: unless-stopped
+  unpackerr:
+    image: ghcr.io/unpackerr/unpackerr:latest
+    container_name: unpackerr
+    networks: [proxy]
+    environment:
+      - TZ=Europe/Rome
+      - UN_SONARR_0_URL=http://sonarr:8989
+      - UN_SONARR_0_API_KEY=${UN_SONARR_0_API_KEY}
+      - UN_SONARR_0_PATH=/downloads/sonarr
+      - UN_RADARR_0_URL=http://radarr:7878
+      - UN_RADARR_0_API_KEY=${UN_RADARR_0_API_KEY}
+      - UN_RADARR_0_PATH=/downloads/radarr
+      - UN_LIDARR_0_URL=http://lidarr:8686
+      - UN_LIDARR_0_API_KEY=${UN_LIDARR_0_API_KEY}
+      - UN_LIDARR_0_PATH=/downloads/lidarr
+      - UN_INTERVAL=5m
+      - PUID=1000
+      - PGID=1000
+    volumes:
+      - ${UNPACKERR_DOWNLOADS}:/downloads
+    restart: unless-stopped
+
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: flaresolverr
+    networks: [proxy]
+    environment:
+      - LOG_LEVEL=info
+      - TZ=Europe/Rome
+      - PUID=1000
+      - PGID=1000
+    ports:
+      - "${FLARESOLVERR_PORT}"
+    restart: unless-stopped
+  recommendarr:
+    image: tannermiddleton/recommendarr:latest
+    container_name: recommendarr
+    networks: [proxy] 
+    ports:
+      - "${RECOMMENDARR_PORT}"
+    volumes:
+      - ${RECOMMENDARR_DATA}:/app/server/data
+    restart: unless-stopped
+  speedtest-tracker:
+    image: lscr.io/linuxserver/speedtest-tracker:latest
+    container_name: speedtest-tracker
+    networks: [proxy] 
+    ports:
+      - "${SPEEDTEST_PORT}"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - APP_KEY=${APP_KEY}
+      - APP_URL=${APP_URL}
+      - SPEEDTEST_SCHEDULE=*/30 * * * *
+      - DB_CONNECTION=sqlite
+    volumes:
+      - ${SPEEDTEST_CONFIG}:/config
+    restart: unless-stopped
+  go2rtc:
+    image: alexxit/go2rtc:latest
+    container_name: go2rtc
+    networks: [proxy]
+    ports:
+      - "${GO2RTC_HTTP_PORT}"
+      - "${GO2RTC_RTSP_PORT}"
+    volumes:
+      - ${GO2RTC_CONFIG}:/config/go2rtc.yaml:ro
+    restart: unless-stopped
+
+  openwatchparty-session:
+    image: ghcr.io/mhbxyz/openwatchparty-session-server:latest
+    container_name: openwatchparty
+    networks: [proxy]
+    ports:
+      - "${OPENWATCHPARTY_PORT}" # evita conflitto con openwebui (3001)
+    environment:
+      - ALLOWED_ORIGINS=${OPENWATCHPARTY_ALLOWED_ORIGINS}
+    restart: unless-stopped
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:2.6.3
+    container_name: n8n
+    networks: [proxy]
+    ports:
+      - "${N8N_PORT_BIND}"
+    environment:
+      - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
+      - N8N_HOST=${N8N_HOST}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - N8N_SECURE_COOKIE=false
+      - NODE_ENV=production
+      - N8N_EDITOR_BASE_URL=${N8N_EDITOR_BASE_URL}
+      - WEBHOOK_URL=${N8N_WEBHOOK_URL}
+      - GENERIC_TIMEZONE=Europe/Rome
+      - TZ=Europe/Rome
+    volumes:
+      - ${N8N_DATA}:/home/node/.n8n
+      - ${N8N_FILES}:/files
+    restart: unless-stopped
+
+
+volumes:
+  jellyfin_config:
+  qbittorrent_config:
+  prowlarr_config:
+  sonarr_config:
+  radarr_config:
+  lidarr_config:
+  readarr_config:
+  recommendarr-data:
+  jellyseerr_config:
+  open-webui:
+  n8n_data:
+networks:
+  proxy:
+    driver: bridge
