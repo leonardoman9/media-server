@@ -58,6 +58,21 @@ services:
       - ${FILEBROWSER_DB}:/database
       - ${FILEBROWSER_CONFIG}:/config
     restart: unless-stopped
+  swiparr:
+    image: ghcr.io/m3sserstudi0s/swiparr:latest
+    container_name: swiparr
+    restart: unless-stopped
+    environment:
+      - PROVIDER=${SWIPARR_PROVIDER}
+      - PROVIDER_LOCK=${SWIPARR_PROVIDER_LOCK}
+      - JELLYFIN_URL=${SWIPARR_JELLYFIN_URL}
+      - JELLYFIN_PUBLIC_URL=${SWIPARR_JELLYFIN_PUBLIC_URL}
+      - AUTH_SECRET=${SWIPARR_AUTH_SECRET}
+    volumes:
+      - ${SWIPARR_DATA}:/app/data
+    ports:
+      - "${SWIPARR_PORT}"
+    networks: [proxy]
   pihole:
     image: pihole/pihole:latest
     container_name: pihole
@@ -111,7 +126,7 @@ services:
       - ${JELLYFIN_CONFIG}:/config
     restart: unless-stopped
   jellyseerr:
-    image: ghcr.io/fallenbagel/jellyseerr:latest
+    image: kinggeorges12/jellyseerr:latest
     init: true
     container_name: jellyseerr
     network_mode: host
